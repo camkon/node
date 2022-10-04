@@ -15,7 +15,8 @@ const PORT = process.env.PORT || 3500
 const serveFile = async (filePath, contentType, response) => {
     try {
         const data = await fsPromises.readFile(filePath, 'utf-8')
-        response.writeHead()
+        response.writeHead(200, {'Content-Type' :  contentType})
+        response.end(data)
     } catch (er) { 
         console.log(er)
         response.statusCode = 500
@@ -24,7 +25,8 @@ const serveFile = async (filePath, contentType, response) => {
 }
 
 const server = http.createServer((req, res) => {
-    console.log(req.url, req.method)
+
+    // console.log(req.url, req.method)
 
     const extention = path.extname(req.url)
 
@@ -40,25 +42,39 @@ const server = http.createServer((req, res) => {
         default: contentType = 'text/html'; break;
     }
 
-    let filePath = 
-        contentType === 'text/html' && req.url === '/'
-            ? path.join(__dirname, 'views', 'index.html')
-            : contentType === 'text/html' && req.url.slice(-1) === '/'
-                ? path.join(__dirname, req.url, 'index.html')
-                : contentType === 'text/html'
-                    ? path.join(__dirname, 'views', req.url)
-                    : path.join(__dirname, req.url)
+    // let filePath = 
+    //     contentType === 'text/html' && req.url === '/'
+    //         ? path.join(__dirname, 'views', 'index.html')
+    //         : contentType === 'text/html' && req.url.slice(-1) === '/'
+    //             ? path.join(__dirname, req.url, 'index.html')
+    //             : contentType === 'text/html'
+    //                 ? path.join(__dirname, 'views', req.url)
+    //                 : path.join(__dirname, req.url)
+
+    if(contentType === 'text/html' && req.url === '/') {
+        filePath = path.join(__dirname, 'views', 'index.html')
+        console.log(filePath)
+    }else if(contentType === 'text/html' && req.url.slice(-1) === '/') {
+        filePath = path.join(__dirname, req.url, 'index.html')
+        console.log(filePath)
+    }else if(contentType === 'text/html') {
+        filePath = path.join(__dirname, 'views', req.url)
+        console.log(filePath)
+    }else {
+        filePath = path.join(__dirname, req.url)
+        console.log(filePath)
+    }
                     
     if(!extention && req.url.slice(-1) != '/') filePath += '.html'
 
     const fileExits = fs.existsSync(filePath)
 
+    // console.log(fileExits)
+
     if(fileExits) {
-        // send file
+        serveFile(filePath, contentType, res)
     }else {
-        console.log(path.parse(filePath))
-        res.writeHead(301, {'Location': '/404.html'})
-        res.end()
+        serveFile(path.join(__dirname, 'views', '404.html'), 'text/html', res)
     }
  
     // if(req.url === '/' || req.url === 'index.html') {
