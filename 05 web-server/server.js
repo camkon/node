@@ -4,31 +4,46 @@ const fs = require('fs')
 const fsPromises = require('fs').promises
 // const logEvents = require('./logEvents')
 const EventEmitter = require('events') 
+const logEvents = require('./logEvents')
 
 
 class Emitter extends EventEmitter {}
 const myEmitter = new Emitter()
 
-const PORT = process.env.PORT || 3500
+myEmitter.on('log', (msg, fileName) => logEvents(msg, fileName))
+
+const PORT = process.env.PORT || 3000
 
 
+//serve the asked file
 const serveFile = async (filePath, contentType, response) => {
     try {
-        const data = await fsPromises.readFile(filePath, 'utf-8')
-        response.writeHead(200, {'Content-Type' :  contentType})
-        response.end(data)
+        const rawData = await fsPromises.readFile(
+            filePath, 
+            // path.parse(filePath).ext != '.html' ?  '' : 'utf-8'
+            !contentType.includes('image') ? 'utf-8' : ''
+        )
+        const data = contentType === 'application/json' ? JSON.parse(rawData) : rawData
+        response.writeHead(
+            filePath.includes('404.html') ? 404 : 200, 
+            {'Content-Type' :  contentType}
+        )
+        response.end(contentType === 'application/json' ? JSON.stringify(data) : data)
     } catch (er) { 
         console.log(er)
+        myEmitter.emit('log', `${er.name}: ${er.message}`, 'error.txt')
         response.statusCode = 500
         response.end()
     }
 }
 
+
+//server
 const server = http.createServer((req, res) => {
 
-    // console.log(req.url, req.method)
-
     const extention = path.extname(req.url)
+    myEmitter.emit('log', `${req.url}\t${req.method}`, 'reqLog.txt')
+
 
     let contentType;
 
@@ -42,84 +57,45 @@ const server = http.createServer((req, res) => {
         default: contentType = 'text/html'; break;
     }
 
-    // let filePath = 
-    //     contentType === 'text/html' && req.url === '/'
-    //         ? path.join(__dirname, 'views', 'index.html')
-    //         : contentType === 'text/html' && req.url.slice(-1) === '/'
-    //             ? path.join(__dirname, req.url, 'index.html')
-    //             : contentType === 'text/html'
-    //                 ? path.join(__dirname, 'views', req.url)
-    //                 : path.join(__dirname, req.url)
-
     if(contentType === 'text/html' && req.url === '/') {
         filePath = path.join(__dirname, 'views', 'index.html')
-        console.log(filePath)
+        console.log('1',filePath)
     }else if(contentType === 'text/html' && req.url.slice(-1) === '/') {
         filePath = path.join(__dirname, req.url, 'index.html')
-        console.log(filePath)
+        console.log('2',filePath)
     }else if(contentType === 'text/html') {
         filePath = path.join(__dirname, 'views', req.url)
-        console.log(filePath)
+        console.log('3',filePath)
     }else {
         filePath = path.join(__dirname, req.url)
-        console.log(filePath)
+        console.log('4',filePath)
     }
                     
     if(!extention && req.url.slice(-1) != '/') filePath += '.html'
 
     const fileExits = fs.existsSync(filePath)
 
-    // console.log(fileExits)
-
     if(fileExits) {
         serveFile(filePath, contentType, res)
     }else {
-        serveFile(path.join(__dirname, 'views', '404.html'), 'text/html', res)
-    }
- 
-    // if(req.url === '/' || req.url === 'index.html') {
-    //     req.statusCode = 200
-    //     res.setHeader('Content-type', 'text/html')
-    //     path = path.join(__dirname, 'views', 'index.html')
-    //     fs.readFile(path, 'utf-8', (er, data) => {
-    //         if(er) throw er
-    //         res.end(data)
-    //     })
-    // }else {
-    //     req.statusCode = 404
-    //     res.setHeader('Content-type', 'text/html')
-    //     path = path.join(__dirname, 'views', '404.html')
-    //     fs.readFile(path, 'utf-8', (er, data) => {
-    //         if(er) throw er
-    //         res.end(data)
-    //     })
-    // }
+        console.log('redirect',fileExits, path.parse(filePath).base);
+        switch(path.parse(filePath).base) {
+            case 'old-page.html' : 
+                serveFile(path.join(__dirname, 'views', 'new-page.html'), 'text/html', res);
+                break;
+            case 'data.html' : 
+                serveFile(path.join(__dirname, 'data', 'data.html'), 'text/html', res);
+                break;
+            default:
+                serveFile(path.join(__dirname, 'views', '404.html'), 'text/html', res);
+                break;
 
-    // switch(req.url) {
-    //     case '/' : 
-    //         req.statusCode = 200
-    //         res.setHeader('Content-type', 'text/html')
-    //         path = path.join(__dirname, 'views', 'index.html')
-    //         fs.readFile(path, 'utf-8', (er, data) => {
-    //             if(er) throw er
-    //             res.end(data)
-    //         })
-    //         break;
-    //     default: 
-    //         req.statusCode = 404
-    //         res.setHeader('Content-type', 'text/html')
-    //         path = path.join(__dirname, 'views', '404.html')
-    //         fs.readFile(path, 'utf-8', (er, data) => {
-    //             if(er) throw er
-    //             res.end(data)
-    //         })
-    //         break;
-    // }
+        }
+    }
+
 })
 
 server.listen(PORT, () => {
     console.log(`server running on port ${PORT}`)
 })
-
-
 

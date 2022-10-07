@@ -10,7 +10,8 @@
     "uuid": "^9.0.0"
   },
   "scripts": {
-    "start": "nodemon server"
+    "start": "node server",
+    "dev": "nodemon server"
   },
   "keywords": [],
   "author": "",
